@@ -1,3 +1,4 @@
+import os
 import logging
 import asyncio
 import nest_asyncio  # pip install nest_asyncio
@@ -16,11 +17,9 @@ from telegram.ext import (
 nest_asyncio.apply()
 
 # --------------------- CONFIGURATION ---------------------
-BOT_TOKEN = "7657191613:AAEybfUD0c-aBAvpIpTuWfaeJIdRVq_tYCo"  
-# उदाहरण: "7657191613:AAEybfUD0c-aBAvpIpTuWfaeJIdRVq_tYCo"
-
-CHANNEL_ID = -1001865650854  
-# उदाहरण: -1001234567890
+# Read sensitive data from environment variables
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID"))
 # ---------------------------------------------------------
 
 logging.basicConfig(
@@ -31,19 +30,19 @@ logging.basicConfig(
 # --------------------- HELPER FUNCTIONS ---------------------
 def clean_text(text: str) -> str:
     """
-    टेक्स्ट में से '@' से शुरू होने वाले हैंडल्स और
-    20 या उससे अधिक अक्षर/डिजिट्स वाले alphanumeric IDs को हटाता है।
+    Removes '@' handles and long alphanumeric IDs (20+ characters) from the text.
     """
     if not text:
         return ""
-    text = re.sub(r'@\w+', '', text)  # @ हैंडल हटाएँ
-    text = re.sub(r'\b[a-fA-F0-9]{20,}\b', '', text)  # लंबे IDs हटाएँ
+    text = re.sub(r'@\w+', '', text)  # Remove @ handles
+    text = re.sub(r'\b[a-fA-F0-9]{20,}\b', '', text)  # Remove long alphanumeric IDs
     return text.strip()
 
 def parse_series_name(file_name: str) -> str:
     """
-    फाइल नेम जैसे "Mahabharat.e267.2014.WEB-DL.1080p.mkv" में से सिर्फ series name (जैसे "Mahabharat") निकालता है।
-    यदि पैटर्न match नहीं होता, तो पूरा file_name return करता है।
+    Extracts the series name from a file name.
+    Example: "Mahabharat.e267.2014.WEB-DL.1080p.mkv" returns "Mahabharat".
+    If the pattern doesn't match, returns the cleaned file name.
     """
     file_name = clean_text(file_name)
     match = re.match(r'^(.*?)\.e\d+\.', file_name, re.IGNORECASE)
@@ -53,7 +52,7 @@ def parse_series_name(file_name: str) -> str:
 
 def parse_quality(file_name: str) -> str:
     """
-    फाइल नेम में से quality (480p, 720p, 1080p) निकालता है।
+    Extracts the quality (480p, 720p, 1080p) from the file name.
     """
     match = re.search(r'(480p|720p|1080p)', file_name, re.IGNORECASE)
     if match:
@@ -62,12 +61,13 @@ def parse_quality(file_name: str) -> str:
 
 def generate_group_key(file_name: str) -> str:
     """
-    Series name और quality के आधार पर group key बनाता है, जैसे "Mahabharat - 1080p".
+    Generates a group key based on the series name and quality.
+    Example: "Mahabharat - 1080p"
     """
     series = parse_series_name(file_name)
     quality = parse_quality(file_name)
     group_key = f"{series} - {quality}"
-    return group_key[:50]  # truncate to 50 characters if needed
+    return group_key[:50]  # Truncate to 50 characters if needed
 
 # --------------------- DATABASE SETUP ---------------------
 conn = sqlite3.connect("database.sqlite", check_same_thread=False)
@@ -117,7 +117,7 @@ async def search_videos(update: Update, context: ContextTypes.DEFAULT_TYPE, quer
         if len(msg_ids) == 1:
             keyboard.append([InlineKeyboardButton(group_key, callback_data=f"single_{msg_ids[0]}")])
         else:
-            # For multiple records, always show both "Send All" and "Search Episode" buttons.
+            # For groups with multiple records, show "Send All" and "Search Episode" buttons.
             keyboard.append([
                 InlineKeyboardButton(group_key, callback_data=f"single_{msg_ids[0]}"),
                 InlineKeyboardButton("Send All", callback_data=f"all_{group_key.replace(' ', '_')}"),
@@ -154,7 +154,6 @@ async def episode_search_handler(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text(
             f"No episode matching '{episode_query}' found for series '{group_key}'.\nSending all episodes instead."
         )
-        # Fallback: send all files in the group
         cursor.execute("SELECT message_id, caption, file_name FROM videos")
         rows = cursor.fetchall()
         selected = []
