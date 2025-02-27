@@ -61,7 +61,7 @@ def parse_quality(file_name: str) -> str:
 
 def generate_group_key(file_name: str) -> str:
     """
-    Generates a group key based on the series name and quality.
+    Generates a group key based on series name and quality.
     Example: "Mahabharat - 1080p"
     """
     series = parse_series_name(file_name)
@@ -117,7 +117,6 @@ async def search_videos(update: Update, context: ContextTypes.DEFAULT_TYPE, quer
         if len(msg_ids) == 1:
             keyboard.append([InlineKeyboardButton(group_key, callback_data=f"single_{msg_ids[0]}")])
         else:
-            # For groups with multiple records, show "Send All" and "Search Episode" buttons.
             keyboard.append([
                 InlineKeyboardButton(group_key, callback_data=f"single_{msg_ids[0]}"),
                 InlineKeyboardButton("Send All", callback_data=f"all_{group_key.replace(' ', '_')}"),
@@ -235,4 +234,6 @@ async def main():
     await app.run_polling()
 
 if __name__ == "__main__":
+    # Uncomment the next line if you want to use a keep-alive web server for 24/7 uptime (Replit, etc.)
+    # from flask import Flask; import threading; app = Flask(''); @app.route('/') def home(): return "I'm alive!"; threading.Thread(target=lambda: app.run(host='0.0.0.0', port=8080)).start()
     asyncio.run(main())
